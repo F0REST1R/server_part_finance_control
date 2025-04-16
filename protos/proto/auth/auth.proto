@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/yourusername/yourproject/proto;auth";
+
+service AuthService {
+  rpc Register (RegisterRequest) returns (AuthResponse);
+
+  rpc Login (LoginRequest) returns (AuthResponse);
+
+  rpc ValidateToken (TokenRequest) returns (TokenResponse);
+
+  rpc LoginVK (VKAuthRequest) returns (AuthResponse);
+}
+
+// --- Запросы и ответы ---
+
+message RegisterRequest {
+  string email = 1;      // Email пользователя
+  string password = 2;   // Пароль (минимум 6 символов)
+  string username = 3;   // Имя пользователя
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;        // JWT-токен
+  User user = 2;           // Данные пользователя
+}
+
+message User {
+  string id = 1;           // UUID пользователя
+  string email = 2;
+  string username = 3;
+  optional string vk_id = 4;  // ID VK (если привязан)
+}
+
+message TokenRequest {
+  string token = 1;
+}
+
+message TokenResponse {
+  bool valid = 1;          // Валиден ли токен
+  optional User user = 2;  // Данные пользователя (если valid=true)
+}
+
+message VKAuthRequest {
+  string vk_token = 1;     // Токен из VK SDK
+  optional string email = 2; // Email (если есть)
+}
