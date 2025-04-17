@@ -10,11 +10,11 @@ import (
 var conn *pgx.Conn
 
 type Config struct {
-	Host     string `env:"POSTGRES_HOST"`
-	Port     string `env:"POSTGRES_PORT"`
-	Username string `env:"POSTGRES_USERNAME"`
-	Password string `env:"POSTGRES_PASSWORD"`
-	Database string `env:"POSTGRES_DATABASE"`
+	Host     string `yaml:"POSTGRES_HOST"`
+	Port     string `yaml:"POSTGRES_PORT"`
+	Username string `yaml:"POSTGRES_USERNAME"`
+	Password string `yaml:"POSTGRES_PASSWORD"`
+	Database string `yaml:"POSTGRES_DATABASE"`
 }
 
 func New(config Config) (*pgx.Conn, error){
