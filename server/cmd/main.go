@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "Server_part_finance_control/server/internal/app"
 	"Server_part_finance_control/server/pkg/config"
 	"Server_part_finance_control/server/pkg/logger"
 	"fmt"
@@ -17,7 +18,7 @@ func main() {
 
 	log.Info("starting application")
 
-	// if err != nil{
-	// 	log.Error("error message: ", slog.String("error", err.Error()))
-	// }
+	// application := app.New(log, cfg.GRPC.PORT, )
+
+	// application.GRPCServer.MustRun()
 }
