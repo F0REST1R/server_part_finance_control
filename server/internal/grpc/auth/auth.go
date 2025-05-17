@@ -6,7 +6,10 @@ import (
 	"Server_part_finance_control/server/internal/jwt"
 	"Server_part_finance_control/server/internal/repository"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +22,12 @@ type serverAPI struct {
 	auth.UnimplementedAuthServiceServer
 	userRepo *repository.UserRepository
 	app models.App
+}
+
+type VKUserData struct{
+	ID string
+	Email string
+	FirstName string
 }
 
 func convertToAuthUser(user *models.User) *auth.User{
@@ -81,31 +90,98 @@ func (s *serverAPI) Register(ctx context.Context, req *auth.RegisterRequest) (*a
 
 }	
 
-func (s *serverAPI) Login(ctx context.Context, req *auth.LoginRequest) (*auth.AuthResponse, error){
-	if req.Email == "" || req.Password == ""{
-		return nil, fmt.Errorf("email and password are required")
+func (s *serverAPI) LoginVK(ctx context.Context, req *auth.VKAuthRequest)(*auth.AuthResponse, error){
+	if req.VkToken == ""{
+		return nil, fmt.Errorf("VK token is required")
 	}
 
-	user, err := s.userRepo.GetUserByEmail(ctx, strings.ToLower(req.Email))
-	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+	vkUser, err := s.getVKUser(ctx, req.VkToken)
 	if err != nil{
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, fmt.Errorf("VK authentication failed: %v", err)
 	}
 
-	token, err := jwt.NewToken(*user, s.app, 24*time.Hour)
-	if err != nil{
-		return nil, fmt.Errorf("failed to generate token")
-	}
+	existingUser, err := s.userRepo.GetUserByVKID(ctx, vkUser.ID)
+	if err == nil {
+        token, err := jwt.NewToken(*existingUser, s.app, 24*time.Hour)
+        if err != nil {
+            return nil, fmt.Errorf("failed to generate token")
+        }
+        return &auth.AuthResponse{
+            Token: token,
+            User:  convertToAuthUser(existingUser),
+        }, nil
+    }
 
-	return &auth.AuthResponse{
-		Token: token,
-		User: convertToAuthUser(user),
-	}, nil
+    if vkUser.Email != "" {
+        emailUser, err := s.userRepo.GetUserByEmail(ctx, vkUser.Email)
+        if err == nil {
+            if err := s.userRepo.UpdateUserVKID(ctx, emailUser.ID, vkUser.ID); err != nil {
+                return nil, fmt.Errorf("failed to link VK account")
+            }
+            token, err := jwt.NewToken(*emailUser, s.app, 24*time.Hour)
+            if err != nil {
+                return nil, fmt.Errorf("failed to generate token")
+            }
+            return &auth.AuthResponse{
+                Token: token,
+                User:  convertToAuthUser(emailUser),
+            }, nil
+        }
+    }
+
+    newUser := &models.User{
+        ID:        fmt.Sprintf("user_%d", time.Now().UnixNano()),
+        Email:     vkUser.Email,
+        Username:  fmt.Sprintf("vk_%s", vkUser.FirstName),
+        VKID:      &vkUser.ID,
+        CreatedAt: time.Now(),
+    }
+
+    if err := s.userRepo.CreateUser(ctx, newUser, ""); 
+    err != nil {
+        return nil, fmt.Errorf("failed to create user")
+    }
+
+    token, err := jwt.NewToken(*newUser, s.app, 24*time.Hour)
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate token")
+    }
+
+    return &auth.AuthResponse{
+        Token: token,
+        User:  convertToAuthUser(newUser),
+    }, nil
 }
 
+func (s *serverAPI) getVKUser (ctx context.Context, token string) (*VKUserData, error){
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := fmt.Sprintf("https://api.vk.com/method/users.get?access_token=%s&v=5.131&fields=email,first_name", token)
 
+	resp, err := client.Get(url)
+	if err != nil{
+		return nil, fmt.Errorf("VK API request failed: %v", err)
+	}
+	defer resp.Body.Close()
 
+	var result struct{
+		Response []struct{
+			ID        int    `json:"id"`
+            FirstName string `json:"first_name"`
+            Email     string `json:"email"`
+		} `json:"response"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil{
+		return nil, fmt.Errorf("failed to decode VK response: %v", err)
+	}
+
+	if len(result.Response) == 0{
+		return nil, fmt.Errorf("empty VK user data")
+	}
+
+	return &VKUserData{
+        ID:        strconv.Itoa(result.Response[0].ID),
+        Email:     result.Response[0].Email,
+        FirstName: result.Response[0].FirstName,
+    }, nil
+}

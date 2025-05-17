@@ -7,5 +7,6 @@ type User struct {
 	Email        string
 	Username     string
 	CreatedAt    time.Time
+	VKID *string
 	PasswordHash string
 }
