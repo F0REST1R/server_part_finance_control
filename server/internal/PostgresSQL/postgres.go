@@ -9,7 +9,7 @@ import (
 )
 
 type PostgresSQL struct{
-	conn *pgx.Conn
+	Conn *pgx.Conn
 }
 
 type Config struct {
@@ -20,36 +20,43 @@ type Config struct {
 	Database string `yaml:"POSTGRES_DATABASE"`
 }
 
-func (c *PostgresSQL) New(config Config, ctx context.Context) (*PostgresSQL, error){
-	var err error
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", config.Username, config.Password, config.Host, config.Port, config.Database)
-	c.conn, err = pgx.Connect(context.Background(), connString)
-	if err != nil{
-		return nil, err
+func NewPost(config Config, ctx context.Context) (*PostgresSQL, error){	
+	connString := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		config.Username,
+		config.Password,
+		config.Host,
+		config.Port,
+		config.Database,
+	)
+
+	conn, err := pgx.Connect(context.Background(), connString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
 	ctxPing, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	if err := c.conn.Ping(ctxPing); err != nil{
-		return nil, fmt.Errorf("failed to ping databse: %w", err)
+	if err := conn.Ping(ctxPing); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &PostgresSQL{conn: c.conn}, nil
+	return &PostgresSQL{Conn: conn}, nil
 }
 
 func (p *PostgresSQL) Close() error {
-	if p.conn != nil{
-		return p.conn.Close(context.Background())
+	if p.Conn != nil{
+		return p.Conn.Close(context.Background())
 	}
 	return nil
 }
 
 func (p *PostgresSQL) HealtCheck(ctx context.Context) error{
-	if p.conn == nil{
+	if p.Conn == nil{
 		return fmt.Errorf("connection is not initialized")
 	}
 
-	return p.conn.Ping(ctx)
+	return p.Conn.Ping(ctx)
 }
 

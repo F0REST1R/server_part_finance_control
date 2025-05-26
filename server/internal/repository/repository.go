@@ -15,11 +15,11 @@ type UserRepository struct {
 	db *pgx.Conn
 }
 
-func NewUserRepository(db *pgx.Conn) *UserRepository{
+func NewUserRepository(db *pgx.Conn) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) CreateUser(ctx context.Context, user *models.User, password string) error{
+func (r *UserRepository) CreateUser(ctx context.Context, user *models.User, password string) error {
 	query := `
 		INSERT INTO users (id, email, username, password_hash, vk_id, created_at)
         VALUES ($1, LOWER($2), $3, $4, $5, $6)
@@ -27,7 +27,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user *models.User, pass
 	`
 
 	err := r.db.QueryRow(ctx, query, user.Email, user.Username, user.VKID, user.CreatedAt, password).Scan(&user.ID, &user.CreatedAt)
-	if err  != nil {
+	if err != nil {
 		if strings.Contains(err.Error(), "duplicated key value") {
 			return fmt.Errorf("user with this email already exists")
 		}
@@ -48,7 +48,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 
 	err := r.db.QueryRow(ctx, query, strings.ToLower(email)).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
-		if err == pgx.ErrNoRows{
+		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)

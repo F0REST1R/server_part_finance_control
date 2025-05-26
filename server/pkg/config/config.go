@@ -1,7 +1,7 @@
 package config
 
 import (
-	postgressql "Server_part_finance_control/server/internal/PostgresSQL"
+	postgresql "Server_part_finance_control/server/internal/PostgresSQL"
 	"fmt"
 	"os"
 
@@ -14,7 +14,7 @@ type gRPC_cfg struct{
 
 type Config struct {
 	ENV string `yaml:"ENV"`
-	POSTGRES postgressql.Config `yaml:"POSTGRES"`
+	POSTGRES postgresql.Config `yaml:"POSTGRES"`
 	GRPC gRPC_cfg `yaml:"GRPC"`
 }
 
